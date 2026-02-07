@@ -1,0 +1,8 @@
+{
+  "name": "SisProf4",
+  "description": "Uma plataforma integrada para gestão escolar com perfis de Professor, Gestor e Super Admin, oferecendo chamada eletrônica, agenda inteligente e acompanhamento de tutoria.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
