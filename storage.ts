@@ -1,7 +1,6 @@
 
 import { User, Escola, Turma, Aluno, Aula, Presenca, Tutoria, Invite } from './types';
 
-// Initial Mock Data
 const MOCK_SCHOOLS: Escola[] = [
   { id: 'esc-1', nome: 'Escola Municipal Central', endereco: 'Rua Principal, 123', ativa: true },
   { id: 'esc-2', nome: 'Colégio Estadual do Futuro', endereco: 'Av. Brasil, 456', ativa: true },
@@ -24,20 +23,20 @@ const MOCK_ALUNOS: Aluno[] = [
   { id: 'alu-3', turma_id: 'tur-2', nome_completo: 'Carla Dias', numero_chamada: 1, status: 'Ativo' },
 ];
 
-// Helper to manage storage with defensive checks
+const SESSION_TIMEOUT = 48 * 60 * 60 * 1000; // 48 hours in ms
+
 export const useStorage = () => {
   const get = <T,>(key: string, initial: T): T => {
     try {
       const data = localStorage.getItem(key);
       if (!data || data === "null") return initial;
       const parsed = JSON.parse(data);
-      // If the parsed data is an array, filter out any null/undefined entries that might have crept in
       if (Array.isArray(parsed)) {
         return parsed.filter(Boolean) as unknown as T;
       }
       return parsed || initial;
     } catch (e) {
-      console.error(`Error loading ${key} from storage:`, e);
+      console.error(`Error loading ${key}:`, e);
       return initial;
     }
   };
@@ -46,7 +45,7 @@ export const useStorage = () => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-      console.error(`Error saving ${key} to storage:`, e);
+      console.error(`Error saving ${key}:`, e);
     }
   };
 
@@ -60,6 +59,42 @@ export const useStorage = () => {
     tutoring: get<Tutoria[]>('tutoring', []),
     invites: get<Invite[]>('invites', []),
     
+    // Session management
+    getSession: (): User | null => {
+      const sessionData = localStorage.getItem('user_session');
+      if (!sessionData) return null;
+      try {
+        const { user, timestamp } = JSON.parse(sessionData);
+        if (Date.now() - timestamp > SESSION_TIMEOUT) {
+          localStorage.removeItem('user_session');
+          return null;
+        }
+        return user;
+      } catch {
+        return null;
+      }
+    },
+    setSession: (user: User | null) => {
+      if (!user) {
+        localStorage.removeItem('user_session');
+      } else {
+        localStorage.setItem('user_session', JSON.stringify({
+          user,
+          timestamp: Date.now()
+        }));
+      }
+    },
+    updateSessionTimestamp: () => {
+      const sessionData = localStorage.getItem('user_session');
+      if (sessionData) {
+        try {
+          const parsed = JSON.parse(sessionData);
+          parsed.timestamp = Date.now();
+          localStorage.setItem('user_session', JSON.stringify(parsed));
+        } catch {}
+      }
+    },
+
     updateUsers: (data: User[]) => set('users', data),
     updateSchools: (data: Escola[]) => set('schools', data),
     updateClasses: (data: Turma[]) => set('classes', data),
