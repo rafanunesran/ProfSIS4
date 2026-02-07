@@ -1,7 +1,6 @@
 
 import { User, Escola, Turma, Aluno, Aula, Presenca, Tutoria, Invite } from './types';
 
-// Dados iniciais para demonstração (serão substituídos pelo localStorage após a primeira interação)
 const MOCK_SCHOOLS: Escola[] = [
   { id: 'esc-1', nome: 'Escola Municipal Central', endereco: 'Rua Principal, 123', ativa: true },
   { id: 'esc-2', nome: 'Colégio Estadual do Futuro', endereco: 'Av. Brasil, 456', ativa: true },
@@ -24,7 +23,7 @@ const MOCK_ALUNOS: Aluno[] = [
   { id: 'alu-3', turma_id: 'tur-2', nome_completo: 'Carla Dias', numero_chamada: 1, status: 'Ativo' },
 ];
 
-const SESSION_TIMEOUT = 48 * 60 * 60 * 1000; // 48 horas em milissegundos
+const SESSION_TIMEOUT = 48 * 60 * 60 * 1000; // 48 horas
 
 export const useStorage = () => {
   const get = <T,>(key: string, initial: T): T => {
@@ -60,13 +59,12 @@ export const useStorage = () => {
     tutoring: get<Tutoria[]>('tutoring', []),
     invites: get<Invite[]>('invites', []),
     
-    // Gerenciamento de Sessão (Login persistente)
+    // Gerenciamento de Sessão (Login persistente 48h)
     getSession: (): User | null => {
       const sessionData = localStorage.getItem('user_session');
       if (!sessionData) return null;
       try {
         const { user, timestamp } = JSON.parse(sessionData);
-        // Verifica se a última atividade foi há menos de 48 horas
         if (Date.now() - timestamp > SESSION_TIMEOUT) {
           localStorage.removeItem('user_session');
           return null;
@@ -97,6 +95,7 @@ export const useStorage = () => {
       }
     },
 
+    // Métodos de Atualização
     updateUsers: (data: User[]) => set('users', data),
     updateSchools: (data: Escola[]) => set('schools', data),
     updateClasses: (data: Turma[]) => set('classes', data),
