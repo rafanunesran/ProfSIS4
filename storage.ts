@@ -23,7 +23,7 @@ const MOCK_ALUNOS: Aluno[] = [
   { id: 'alu-3', turma_id: 'tur-2', nome_completo: 'Carla Dias', numero_chamada: 1, status: 'Ativo' },
 ];
 
-const SESSION_TIMEOUT = 48 * 60 * 60 * 1000; // 48 hours in ms
+const SESSION_TIMEOUT = 48 * 60 * 60 * 1000; // 48 horas
 
 export const useStorage = () => {
   const get = <T,>(key: string, initial: T): T => {
@@ -31,12 +31,10 @@ export const useStorage = () => {
       const data = localStorage.getItem(key);
       if (!data || data === "null") return initial;
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(Boolean) as unknown as T;
-      }
+      if (Array.isArray(parsed)) return parsed.filter(Boolean) as unknown as T;
       return parsed || initial;
     } catch (e) {
-      console.error(`Error loading ${key}:`, e);
+      console.error(`Erro ao carregar ${key}:`, e);
       return initial;
     }
   };
@@ -45,7 +43,7 @@ export const useStorage = () => {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
-      console.error(`Error saving ${key}:`, e);
+      console.error(`Erro ao salvar ${key}:`, e);
     }
   };
 
@@ -59,7 +57,6 @@ export const useStorage = () => {
     tutoring: get<Tutoria[]>('tutoring', []),
     invites: get<Invite[]>('invites', []),
     
-    // Session management
     getSession: (): User | null => {
       const sessionData = localStorage.getItem('user_session');
       if (!sessionData) return null;

@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { User, Escola, Turma, Aluno, Aula, Presenca, Tutoria, Invite, Role } from './types';
-// Fixed: Using 'storage.ts' which contains the required session management methods missing in 'store.ts'
 import { useStorage } from './storage';
 import Layout from './components/Layout';
 import Dashboard from './modules/Dashboard';
@@ -9,7 +8,6 @@ import Attendance from './modules/Attendance';
 import { Card, Button, Input, Modal, Badge } from './components/UI';
 import { 
   Users, 
-  GraduationCap, 
   ArrowRight, 
   PlusCircle, 
   Mail, 
@@ -26,25 +24,21 @@ import {
 
 const App: React.FC = () => {
   const storage = useStorage();
-  // Fixed: storage.getSession() is available in the 'storage' module
   const [currentUser, setCurrentUser] = React.useState<User | null>(storage.getSession());
   const [activeView, setActiveView] = React.useState('dashboard');
   const [selectedTurma, setSelectedTurma] = React.useState<Turma | null>(null);
   const [selectedEscolaId, setSelectedEscolaId] = React.useState<string | null>(null);
   
-  // Auth State
   const [isRegistering, setIsRegistering] = React.useState(false);
   const [loginEmail, setLoginEmail] = React.useState('');
   const [loginPassword, setLoginPassword] = React.useState('');
   const [loginError, setLoginError] = React.useState('');
   
-  // Registration State
   const [regName, setRegName] = React.useState('');
   const [regEmail, setRegEmail] = React.useState('');
   const [regPassword, setRegPassword] = React.useState('');
   const [regEscolaId, setRegEscolaId] = React.useState('');
 
-  // Modals
   const [isSchoolModalOpen, setIsSchoolModalOpen] = React.useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = React.useState(false);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = React.useState(false);
@@ -55,7 +49,6 @@ const App: React.FC = () => {
   // Sincroniza atividade do usuário para estender os 48h
   React.useEffect(() => {
     if (currentUser) {
-      // Fixed: storage.updateSessionTimestamp() is available in the 'storage' module
       storage.updateSessionTimestamp();
     }
   }, [activeView, selectedTurma, selectedEscolaId]);
@@ -71,7 +64,6 @@ const App: React.FC = () => {
     const user = storage.users.find(u => u && u.email === loginEmail);
     if (user && user.ativa && (loginPassword === 'Amor@9391' || loginPassword === 'admin')) {
       setCurrentUser(user);
-      // Fixed: storage.setSession() is available in the 'storage' module
       storage.setSession(user);
       setLoginError('');
     } else if (user && !user.ativa) {
@@ -83,10 +75,7 @@ const App: React.FC = () => {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regEscolaId) {
-      alert('Por favor, selecione uma escola.');
-      return;
-    }
+    if (!regEscolaId) return alert('Selecione uma escola.');
     const invite = storage.invites.find(i => i && i.email === regEmail);
     const role = invite ? invite.role : 'professor';
     const newUser: User = {
@@ -98,16 +87,13 @@ const App: React.FC = () => {
       ativa: true
     };
     storage.updateUsers([...storage.users, newUser]);
-    if (invite) {
-      storage.updateInvites(storage.invites.filter(i => i && i.email !== regEmail));
-    }
-    alert(`Cadastro realizado com sucesso como ${role}! Faça login.`);
+    if (invite) storage.updateInvites(storage.invites.filter(i => i && i.email !== regEmail));
+    alert(`Cadastro realizado! Faça login.`);
     setIsRegistering(false);
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
-    // Fixed: storage.setSession() is available in the 'storage' module
     storage.setSession(null);
     setActiveView('dashboard');
     setSelectedEscolaId(null);
@@ -132,7 +118,7 @@ const App: React.FC = () => {
     storage.updateInvites([...storage.invites, invite]);
     setIsInviteModalOpen(false);
     setInviteEmail('');
-    alert(`Convite enviado.`);
+    alert(`Convite registrado.`);
   };
 
   const handleUserAction = (userId: string, action: 'toggle' | 'reset' | 'delete' | 'edit') => {
@@ -144,9 +130,9 @@ const App: React.FC = () => {
       userList[userIdx].ativa = !userList[userIdx].ativa;
       storage.updateUsers(userList);
     } else if (action === 'reset') {
-      alert(`Senha de ${userList[userIdx].nome} resetada para padrão "123456".`);
+      alert(`Senha de ${userList[userIdx].nome} resetada para "123456".`);
     } else if (action === 'delete') {
-      if (confirm(`Deseja EXCLUIR permanentemente ${userList[userIdx].nome}?`)) {
+      if (confirm(`Excluir permanentemente ${userList[userIdx].nome}?`)) {
         userList.splice(userIdx, 1);
         storage.updateUsers(userList);
       }
@@ -165,7 +151,6 @@ const App: React.FC = () => {
       storage.updateUsers(userList);
       if (currentUser?.id === editingUser.id) {
           setCurrentUser(editingUser);
-          // Fixed: storage.setSession() is available in the 'storage' module
           storage.setSession(editingUser);
       }
     }
