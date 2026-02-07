@@ -1,108 +1,132 @@
 
+import { useState, useEffect } from 'react';
+import { db } from './firebase';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  deleteDoc,
+  FirestoreError,
+  query,
+  limit
+} from "firebase/firestore";
 import { User, Escola, Turma, Aluno, Aula, Presenca, Tutoria, Invite } from './types';
 
-const MOCK_SCHOOLS: Escola[] = [
-  { id: 'esc-1', nome: 'Escola Municipal Central', endereco: 'Rua Principal, 123', ativa: true },
-  { id: 'esc-2', nome: 'Colégio Estadual do Futuro', endereco: 'Av. Brasil, 456', ativa: true },
-];
-
-const MOCK_USERS: User[] = [
-  { id: 'usr-1', email: 'rafael@adm', nome: 'Rafael Admin', role: 'super_admin', ativa: true },
-  { id: 'usr-2', email: 'gestor@escola', nome: 'Carlos Gestor', role: 'gestor', escola_id: 'esc-1', ativa: true },
-  { id: 'usr-3', email: 'prof@escola', nome: 'Maria Professora', role: 'professor', escola_id: 'esc-1', ativa: true },
-];
-
-const MOCK_TURMAS: Turma[] = [
-  { id: 'tur-1', escola_id: 'esc-1', nome: '9º A', turno: 'Manhã' },
-  { id: 'tur-2', escola_id: 'esc-1', nome: '1º Médio B', turno: 'Tarde' },
-];
-
-const MOCK_ALUNOS: Aluno[] = [
-  { id: 'alu-1', turma_id: 'tur-1', nome_completo: 'Ana Silva', numero_chamada: 1, status: 'Ativo' },
-  { id: 'alu-2', turma_id: 'tur-1', nome_completo: 'Bruno Souza', numero_chamada: 2, status: 'Ativo' },
-  { id: 'alu-3', turma_id: 'tur-2', nome_completo: 'Carla Dias', numero_chamada: 1, status: 'Ativo' },
-];
-
-const SESSION_TIMEOUT = 48 * 60 * 60 * 1000; // 48 horas
+const SESSION_KEY = 'user_session';
+const SESSION_TIMEOUT = 48 * 60 * 60 * 1000;
 
 export const useStorage = () => {
-  const get = <T,>(key: string, initial: T): T => {
-    try {
-      const data = localStorage.getItem(key);
-      if (!data || data === "null") return initial;
-      const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) {
-        return parsed.filter(Boolean) as unknown as T;
+  const [users, setUsers] = useState<User[]>([]);
+  const [schools, setSchools] = useState<Escola[]>([]);
+  const [classes, setClasses] = useState<Turma[]>([]);
+  const [students, setStudents] = useState<Aluno[]>([]);
+  const [lessons, setLessons] = useState<Aula[]>([]);
+  const [attendance, setAttendance] = useState<Presenca[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleError = (err: FirestoreError) => {
+      console.error("Firestore Error:", err);
+      if (err.code === 'permission-denied') {
+        setError("Erro de permissão: O Firestore está ativo mas as regras de segurança estão bloqueando o acesso. Configure o banco para 'Modo de Teste'.");
+      } else if (err.message.includes('Service firestore is not available')) {
+        setError("Erro de carregamento do Firebase. Verifique sua conexão e recarregue a página.");
+      } else {
+        setError(err.message);
       }
-      return parsed || initial;
+      setLoading(false);
+    };
+
+    // Subscriptions com proteção contra documentos nulos
+    const unsubUsers = onSnapshot(collection(db, "users"), (s) => {
+      setUsers(s.docs.map(d => ({ id: d.id, ...d.data() }) as User));
+      setLoading(false);
+    }, handleError);
+
+    const unsubSchools = onSnapshot(collection(db, "schools"), (s) => 
+      setSchools(s.docs.map(d => ({ id: d.id, ...d.data() }) as Escola)), handleError);
+    
+    const unsubClasses = onSnapshot(collection(db, "classes"), (s) => 
+      setClasses(s.docs.map(d => ({ id: d.id, ...d.data() }) as Turma)), handleError);
+    
+    const unsubStudents = onSnapshot(collection(db, "students"), (s) => 
+      setStudents(s.docs.map(d => ({ id: d.id, ...d.data() }) as Aluno)), handleError);
+    
+    const unsubLessons = onSnapshot(collection(db, "lessons"), (s) => 
+      setLessons(s.docs.map(d => ({ id: d.id, ...d.data() }) as Aula)), handleError);
+    
+    const unsubAttendance = onSnapshot(collection(db, "attendance"), (s) => 
+      setAttendance(s.docs.map(d => ({ id: d.id, ...d.data() }) as Presenca)), handleError);
+    
+    const unsubInvites = onSnapshot(collection(db, "invites"), (s) => 
+      setInvites(s.docs.map(d => d.data() as Invite)), handleError);
+
+    return () => {
+      unsubUsers(); unsubSchools(); unsubClasses(); unsubStudents(); unsubLessons(); unsubAttendance(); unsubInvites();
+    };
+  }, []);
+
+  const saveToFirestore = async (coll: string, id: string, data: any) => {
+    try {
+      await setDoc(doc(db, coll, id), data, { merge: true });
     } catch (e) {
-      console.error(`Erro ao carregar ${key}:`, e);
-      return initial;
+      console.error("Erro ao salvar no Firestore:", e);
+      throw e;
     }
   };
 
-  const set = <T,>(key: string, value: T) => {
+  const deleteFromFirestore = async (coll: string, id: string) => {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      await deleteDoc(doc(db, coll, id));
     } catch (e) {
-      console.error(`Erro ao salvar ${key}:`, e);
+      console.error("Erro ao excluir no Firestore:", e);
+      throw e;
     }
   };
 
   return {
-    users: get<User[]>('users', MOCK_USERS),
-    schools: get<Escola[]>('schools', MOCK_SCHOOLS),
-    classes: get<Turma[]>('classes', MOCK_TURMAS),
-    students: get<Aluno[]>('students', MOCK_ALUNOS),
-    lessons: get<Aula[]>('lessons', []),
-    attendance: get<Presenca[]>('attendance', []),
-    tutoring: get<Tutoria[]>('tutoring', []),
-    invites: get<Invite[]>('invites', []),
+    users, schools, classes, students, lessons, attendance, invites, loading, error,
     
-    // Gerenciamento de Sessão (Login persistente 48h)
     getSession: (): User | null => {
-      const sessionData = localStorage.getItem('user_session');
+      const sessionData = localStorage.getItem(SESSION_KEY);
       if (!sessionData) return null;
       try {
         const { user, timestamp } = JSON.parse(sessionData);
         if (Date.now() - timestamp > SESSION_TIMEOUT) {
-          localStorage.removeItem('user_session');
+          localStorage.removeItem(SESSION_KEY);
           return null;
         }
         return user;
-      } catch {
-        return null;
-      }
+      } catch { return null; }
     },
+
     setSession: (user: User | null) => {
-      if (!user) {
-        localStorage.removeItem('user_session');
-      } else {
-        localStorage.setItem('user_session', JSON.stringify({
-          user,
-          timestamp: Date.now()
-        }));
-      }
+      if (!user) localStorage.removeItem(SESSION_KEY);
+      else localStorage.setItem(SESSION_KEY, JSON.stringify({ user, timestamp: Date.now() }));
     },
+
     updateSessionTimestamp: () => {
-      const sessionData = localStorage.getItem('user_session');
+      const sessionData = localStorage.getItem(SESSION_KEY);
       if (sessionData) {
         try {
           const parsed = JSON.parse(sessionData);
           parsed.timestamp = Date.now();
-          localStorage.setItem('user_session', JSON.stringify(parsed));
+          localStorage.setItem(SESSION_KEY, JSON.stringify(parsed));
         } catch {}
       }
     },
 
-    // Métodos de Atualização
-    updateUsers: (data: User[]) => set('users', data),
-    updateSchools: (data: Escola[]) => set('schools', data),
-    updateClasses: (data: Turma[]) => set('classes', data),
-    updateStudents: (data: Aluno[]) => set('students', data),
-    updateLessons: (data: Aula[]) => set('lessons', data),
-    updateAttendance: (data: Presenca[]) => set('attendance', data),
-    updateTutoring: (data: Tutoria[]) => set('tutoring', data),
-    updateInvites: (data: Invite[]) => set('invites', data),
+    upsertUser: (u: User) => saveToFirestore("users", u.id, u),
+    deleteUser: (id: string) => deleteFromFirestore("users", id),
+    upsertSchool: (s: Escola) => saveToFirestore("schools", s.id, s),
+    upsertClass: (t: Turma) => saveToFirestore("classes", t.id, t),
+    upsertStudent: (a: Aluno) => saveToFirestore("students", a.id, a),
+    upsertLesson: (l: Aula) => saveToFirestore("lessons", l.id, l),
+    upsertAttendance: (p: Presenca) => saveToFirestore("attendance", p.id, p),
+    addInvite: (i: Invite) => setDoc(doc(db, "invites", i.email), i),
+    removeInvite: (email: string) => deleteDoc(doc(db, "invites", email))
   };
 };
